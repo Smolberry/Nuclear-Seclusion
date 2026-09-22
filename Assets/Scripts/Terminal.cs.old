@@ -1,0 +1,119 @@
+using UnityEngine;
+using System.Collections; 
+using System.Collections.Generic;   
+using UnityEngine.InputSystem;
+public class Terminal : MonoBehaviour
+{
+    // public InputActionAsset InputActions;
+    // ActivateInputField is an option
+    [SerializeField] private TMPro.TMP_Text outputText;
+    [SerializeField] private TMPro.TMP_InputField inputField;
+    [SerializeField] private Transform monitor;
+    [SerializeField] private Transform cameraPivot;
+    [SerializeField] private float focusDistance = 2f;
+    [SerializeField] private float moveSpeed = 10f;
+    [SerializeField] private float rotateSpeed = 5f;
+    [SerializeField] private InputActionReference mouseClick;
+    [SerializeField] private InputActionReference escapeKey;
+
+    private Backend backend = new Backend();
+    private bool _isFocused = false;
+    public bool IsFocused => _isFocused;
+    // focus|unfocus
+    private Vector3 originalPos;
+    private Quaternion originalRot;
+    private Vector3 focusPos;
+    private Quaternion focusRot;
+    
+
+    private void Start()
+    {
+        AppendOutput("Terminal ready. Type 'help' for commands.");
+    }
+
+    private void Update()
+    {
+        if (!_isFocused)
+        {
+            if (Mouse.current.leftButton.wasPressedThisFrame &&
+                UnityEngine.EventSystems.EventSystem.current.IsPointerOverGameObject())
+            {
+                Ray ray = Camera.main.ScreenPointToRay(Mouse.current.position.ReadValue());
+                if (Physics.Raycast(ray, out RaycastHit hit) &&
+                    hit.collider.transform == monitor)
+                {
+                    FocusOnMonitor();
+                }
+            }
+        }
+        else
+        {
+            if (Keyboard.current.escapeKey.wasPressedThisFrame)
+            {
+                UnfocusFromMonitor();
+            }
+        }
+    }
+    private void Awake()
+    {
+        // playerInteractAction = InputSystem.actions.FindAction("Interact");
+    }
+
+    private void FocusOnMonitor()
+    {
+        _isFocused = true;
+        originalPos = cameraPivot.position;
+        originalRot = cameraPivot.rotation;
+
+        Vector3 focusPos = monitor.position + monitor.forward * focusDistance;
+        Quaternion focusRot = Quaternion.LookRotation(-monitor.forward, Vector3.up);
+
+        StartCoroutine(MoveCamera(focusPos, focusRot));
+        inputField.ActivateInputField();
+    }
+
+    private void UnfocusFromMonitor()
+    {
+        _isFocused = false;
+        inputField.DeactivateInputField();
+        StartCoroutine(MoveCamera(originalPos, originalRot));
+    }
+
+    IEnumerator MoveCamera(Vector3 targetPos, Quaternion targetRot)
+    {
+        while (Vector3.Distance(cameraPivot.position, targetPos) > 0.01f ||
+               Quaternion.Angle(cameraPivot.rotation, targetRot) > 0.1f)
+        {
+            cameraPivot.position = Vector3.MoveTowards(cameraPivot.position, targetPos, moveSpeed * Time.deltaTime);
+            cameraPivot.rotation = Quaternion.Slerp(cameraPivot.rotation, targetRot, rotateSpeed * Time.deltaTime);
+            yield return null;
+        }
+        cameraPivot.position = targetPos;
+        cameraPivot.rotation = targetRot;
+    }
+
+    private void OnSubmit(string value)
+    {
+        if (!_isFocused) return;
+
+        AppendOutput($"> {value}");
+        string result = backend.ProcessCommand(value);
+        if (result == null)
+        {
+            UnfocusFromMonitor();
+            return;
+        }
+        AppendOutput(result);
+        inputField.ActivateInputField(); // re-focus after submit
+    }
+    private const int MaxLines = 20;
+    private List<string> lines = new List<string>();
+    private void AppendOutput(string text)
+    {
+        lines.Add(text);
+        if (lines.Count > MaxLines)
+            lines.RemoveAt(0);
+        outputText.text = string.Join("\n", lines);
+        // Scroll to bottom
+    }
+}
