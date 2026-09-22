@@ -83,7 +83,7 @@ public class LanguageWrapper
         }
         else if (val[0]=='{'&&val[-1]=='}')
         {
-            return "list";
+            return "dictionary";
         }
         else if (val[0]=='('&&val[-1]==')')
         {
