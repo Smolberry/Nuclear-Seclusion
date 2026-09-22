@@ -20,7 +20,7 @@ using System.Linq;
 using UnityEngine;
 using UnityEngine.PlayerLoop;
 using UnityEngine.UIElements;
-public class Backend : MonoBehaviour
+public static class Backend : MonoBehaviour
 {
     [SerializeField]
     private static List<GameObject> termlist;
